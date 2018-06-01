@@ -1,0 +1,24 @@
+---
+
+# - name: Remove any existing Docker container named {{ docker_container_name }}.
+#   docker_container:
+#     name: '{{ docker_container_name }}'
+#     state: absent
+#   become: true
+#   when: remove_docker_container is defined
+
+- name: Pull the Docker image {{ docker_container_image_name }}:{{ docker_container_tag }}.
+  docker_image:
+    name: '{{ docker_container_image_name }}'
+    tag: '{{ docker_container_tag }}'
+  become: true
+
+- name: Build the {{ docker_container_image_name }}:{{ docker_container_version }} container from the Dockerfile.
+  docker_image:
+    archive_path: '{{ docker_container_archive_path if docker_container_archive_path is defined else omit }}'
+    buildargs: '{{ docker_build_args if docker_build_args is defined else omit }}'
+    name: '{{ docker_container_image_path }}:{{ docker_container_version }}'
+    path: '{{ docker_container_path if docker_container_path is defined else omit }}'
+    force: '{{ true if docker_remove_container is defined else omit }}'
+    rm: true
+  become: true

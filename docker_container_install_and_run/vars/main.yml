@@ -1,0 +1,3 @@
+---
+
+docker_container_published_port: '{{ docker_container_port }}:{{ docker_container_port }}'

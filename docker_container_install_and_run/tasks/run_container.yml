@@ -1,0 +1,91 @@
+---
+
+- name: Get the current system timezone.
+  command: 'date +%Z'
+  changed_when: no
+  register: timezone
+
+- name: Print the current system timezone.
+  debug:
+    msg: 'Current system timezone is {{ timezone.stdout }}'
+
+- name: Run the {{ docker_container_name }}:{{ docker_container_version }} container via Docker on the specified port, with published ports.
+  docker_container:
+    env:
+      TZ: '{{ timezone.stdout }}'
+    command: "{{ docker_command if docker_command is defined else omit }}"
+#     command: 'ln -fs /usr/share/zoneinfo/Europe/London /etc/localtime && dpkg-reconfigure -f noninteractive tzdata'
+    exposed_ports:
+      - '{{ docker_container_port if docker_container_port is defined else omit }}'
+    image: '{{ docker_container_image_path }}:{{ docker_container_version }}'
+    interactive: "{{ true if docker_container_run_interactively is defined else omit }}"
+    name: '{{ docker_container_name }}'
+    # TODO Create a network, so this step can always be performed.
+    #networks:
+    #  - '{{ docker_container_network_name }}'
+    published_ports: '{{ docker_container_published_ports }}'
+    recreate: "{{ true if docker_remove_container is defined else omit }}"
+    restart_policy: always
+    tty: "{{ true if docker_container_run_interactively is defined else omit }}"
+    volumes: "{{ docker_volumes if docker_volumes is defined else omit }}"
+  become: true
+  when: docker_container_published_ports is defined
+
+- name: Run the {{ docker_container_name }}:{{ docker_container_version }} container via Docker on the specified port, without published ports.
+  docker_container:
+    env:
+      TZ: '{{ timezone.stdout }}'
+    command: "{{ docker_command if docker_command is defined else omit }}"
+#     command: 'ln -fs /usr/share/zoneinfo/Europe/London /etc/localtime && dpkg-reconfigure -f noninteractive tzdata'
+    exposed_ports:
+      - '{{ docker_container_port if docker_container_port is defined else omit }}'
+    image: '{{ docker_container_image_path }}:{{ docker_container_version }}'
+    interactive: "{{ true if docker_container_run_interactively is defined else omit }}"
+    name: '{{ docker_container_name }}'
+    # TODO Create a network, so this step can always be performed.
+    #networks:
+    #  - '{{ docker_container_network_name }}'
+    recreate: "{{ true if docker_remove_container is defined else omit }}"
+    restart_policy: always
+    tty: "{{ true if docker_container_run_interactively is defined else omit }}"
+    volumes: "{{ docker_volumes if docker_volumes is defined else omit }}"
+  become: true
+  when: not docker_container_published_ports is defined
+
+- name: Get the {{ docker_container_name }} container ID.
+  command: 'docker container ls --filter "name={{ docker_container_name }}" --quiet'
+  register: docker_container_id
+  become: true
+
+- name: Print the {{ docker_container_name }} container ID.
+  debug:
+    msg: 'Container ID is {{ docker_container_id.stdout }}'
+
+- name: Get the {{ docker_container_name }} container IP address.
+  command: 'docker container inspect {{ docker_container_id.stdout }} --format "{% raw %}{{ .NetworkSettings.IPAddress }}{% endraw %}"'
+  register: docker_container_ip_address
+  become: true
+
+- name: Print the {{ docker_container_name }} container IP address.
+  debug:
+    msg: 'Container IP address is {{ docker_container_ip_address.stdout }}'
+
+- name: Poll the {{ docker_container_name }} status.
+  uri:
+    return_content: yes
+    status_code: 200
+    timeout: 300
+    url: 'http://{{ docker_container_ip_address.stdout }}:{{ docker_container_port }}'
+  delay: 5
+  retries: 60
+  register: docker_container_status
+  until: docker_container_status.results.status == 200
+  when: docker_container_hosts_webservice and docker_container_ip_address is defined and docker_container_port is defined
+
+- name: Wait for activity on port {{ docker_container_port }}.
+  local_action:
+    module: wait_for
+    host: '{{ docker_container_ip_address.stdout }}'
+    port: '{{ docker_container_port }}'
+    timeout: 300
+  when: (not docker_container_hosts_webservice) and docker_container_ip_address is defined and docker_container_port is defined

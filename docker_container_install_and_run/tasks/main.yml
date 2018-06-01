@@ -1,0 +1,19 @@
+---
+
+- name: Log in to DockerHub.
+  docker_login:
+    username: djrees
+    password: '{{ dockerhub_password }}'
+    email: 'd_j_rees@hotmail.com'
+  when: docker_login_required
+  become: yes
+
+- include: install_image.yml
+- include: run_container.yml
+
+- name: Log out of DockerHub.
+  docker_login:
+    email: 'd_j_rees@hotmail.com'
+    state: absent
+  when: docker_login_required
+  become: yes

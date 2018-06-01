@@ -1,0 +1,47 @@
+---
+
+# - name: Install APT packages for installing Docker.
+#   package:
+#     name: '{{ item }}'
+#   with_items:
+#     - 'apt-transport-https=1.2.24'
+#     - 'ca-certificates=20160104ubuntu1'
+#     - 'curl=7.47.0-1ubuntu2.2'
+#     - 'software-properties-common=0.96.20.7'
+#   become: 'yes'
+
+- name: Install the APT repo for Docker CE.
+  apt_repository:
+    repo: 'deb https://download.docker.com/linux/ubuntu xenial stable' # [arch=amd64] failed
+  become: true
+
+- name: Install the key for the Docker CE repo.
+  apt_key:
+    url: 'https://download.docker.com/linux/ubuntu/gpg'
+  become: true
+
+- name: Update the APT repos for Docker CE.
+  apt:
+    update_cache: true
+  become: true
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Install Docker CE.
+  package:
+    name: docker-ce
+  become: true
+
+- name: Install pip.
+  easy_install:
+    name: pip
+  become: true
+
+- name: Install docker-py.
+  pip:
+    name: docker-py
+    state: present
+    version: 1.10.6
+  become: true
+#DAN Still treating this as being defined
+#    docker_container_published_ports:
